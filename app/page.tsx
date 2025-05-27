@@ -490,6 +490,7 @@ export default function FooocusInpaintingApp() {
         method: "GET",
         headers: {
           "ngrok-skip-browser-warning": "true",
+          "User-Agent": "FooocusInpaintingApp/1.0",
         },
       });
 
@@ -526,9 +527,11 @@ export default function FooocusInpaintingApp() {
     try {
       const response = await fetch(
         `${sessionState.apiUrl}/v1/generation/job-queue`,
+
         {
           headers: {
             "ngrok-skip-browser-warning": "true",
+            "User-Agent": "FooocusInpaintingApp/1.0",
           },
         }
       );
@@ -545,9 +548,11 @@ export default function FooocusInpaintingApp() {
     try {
       const response = await fetch(
         `${sessionState.apiUrl}/v1/generation/job-history`,
+
         {
           headers: {
             "ngrok-skip-browser-warning": "true",
+            "User-Agent": "FooocusInpaintingApp/1.0",
           },
         }
       );
@@ -564,9 +569,11 @@ export default function FooocusInpaintingApp() {
     try {
       const response = await fetch(
         `${sessionState.apiUrl}/v1/generation/query-job?job_id=${jobId}&require_step_preview=false`,
+
         {
           headers: {
             "ngrok-skip-browser-warning": "true",
+            "User-Agent": "FooocusInpaintingApp/1.0",
           },
         }
       );
@@ -576,7 +583,10 @@ export default function FooocusInpaintingApp() {
 
         if (data.job_status === "Finished" && data.job_result?.[0]?.url) {
           let imageUrl = data.job_result[0].url;
-          imageUrl= imageUrl.replace("http://127.0.0.1:8888", sessionState.apiUrl);
+          imageUrl = imageUrl.replace(
+            "http://127.0.0.1:8888",
+            sessionState.apiUrl
+          );
           setResultImage(imageUrl);
 
           // Fetch the image as blob for proper download
@@ -584,6 +594,7 @@ export default function FooocusInpaintingApp() {
             const imageResponse = await fetch(imageUrl, {
               headers: {
                 "ngrok-skip-browser-warning": "true",
+                "User-Agent": "FooocusInpaintingApp/1.0",
               },
             });
             const blob = await imageResponse.blob();
@@ -620,10 +631,12 @@ export default function FooocusInpaintingApp() {
     try {
       const response = await fetch(
         `${sessionState.apiUrl}/v1/generation/stop`,
+
         {
           method: "POST",
           headers: {
             "ngrok-skip-browser-warning": "true",
+            "User-Agent": "FooocusInpaintingApp/1.0",
           },
         }
       );
@@ -820,11 +833,13 @@ export default function FooocusInpaintingApp() {
 
       const response = await fetch(
         `${sessionState.apiUrl}/v2/generation/image-inpaint-outpaint`,
+
         {
           method: "POST",
           headers: {
             "Content-Type": "application/json",
             "ngrok-skip-browser-warning": "true",
+            "User-Agent": "FooocusInpaintingApp/1.0",
           },
           body: JSON.stringify(requestBody),
         }
