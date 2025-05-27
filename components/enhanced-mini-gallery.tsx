@@ -1,9 +1,15 @@
 "use client";
 
 import type React from "react";
-import { useState, useEffect, useRef } from "react";
+import { useState, useEffect, useRef, memo } from "react";
 import { Button } from "@/components/ui/button";
-import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
+import {
+  Card,
+  CardContent,
+  CardFooter,
+  CardHeader,
+  CardTitle,
+} from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
 import {
   Dialog,
@@ -11,17 +17,29 @@ import {
   DialogHeader,
   DialogTitle,
 } from "@/components/ui/dialog";
-import { Download, Trash2, Eye, Images, Calendar } from "lucide-react";
+import {
+  Download,
+  Trash,
+  Edit,
+  Check,
+  X,
+  Eye,
+  Images,
+  Calendar,
+} from "lucide-react";
 import { toast } from "@/hooks/use-toast";
 
 export interface GeneratedImage {
   id: string;
   url: string;
   blob?: Blob;
-  prompt: string;
+  // Store the base64 string directly for permanent storage
+  base64Data?: string;
+  prompt?: string;
+  negativePrompt?: string;
+  name?: string;
   timestamp: number;
   jobId?: string;
-  name?: string;
 }
 
 interface EnhancedMiniGalleryProps {
@@ -32,10 +50,157 @@ interface EnhancedMiniGalleryProps {
   onUpdateImage: (id: string, updates: Partial<GeneratedImage>) => void;
 }
 
+// Memoized image component to prevent unnecessary re-renders
+const GalleryImage = memo(
+  ({
+    image,
+    onDeleteImage,
+    onDownloadImage,
+    onRenameImage,
+    onUpdateImage,
+  }: {
+    image: GeneratedImage;
+    onDeleteImage: (id: string) => void;
+    onDownloadImage: (image: GeneratedImage) => void;
+    onRenameImage: (id: string, newName: string) => void;
+    onUpdateImage: (id: string, updates: Partial<GeneratedImage>) => void;
+  }) => {
+    const [isEditing, setIsEditing] = useState(false);
+    const [newName, setNewName] = useState(image.name || "");
+    const [imageSrc, setImageSrc] = useState<string>(image.url);
+    const [isLoading, setIsLoading] = useState(false);
+    const imageRef = useRef<HTMLImageElement>(null);
+
+    // Load image from base64 if available (for revisits)
+    useEffect(() => {
+      if (image.base64Data && (!imageSrc || imageSrc.includes("ngrok"))) {
+        setImageSrc(`data:image/png;base64,${image.base64Data}`);
+      }
+    }, [image.base64Data, imageSrc]);
+
+    const handleDownload = () => {
+      onDownloadImage(image);
+    };
+
+    const handleDelete = () => {
+      onDeleteImage(image.id);
+    };
+
+    const startEditing = () => {
+      setIsEditing(true);
+    };
+
+    const saveEdit = () => {
+      onRenameImage(image.id, newName);
+      setIsEditing(false);
+    };
+
+    const cancelEdit = () => {
+      setNewName(image.name || "");
+      setIsEditing(false);
+    };
+
+    const handleImageError = () => {
+      // If image fails to load from URL, try using base64 if available
+      if (image.base64Data) {
+        setImageSrc(`data:image/png;base64,${image.base64Data}`);
+      }
+    };
+
+    return (
+      <div className="gallery-item">
+        <div className="relative aspect-square overflow-hidden rounded-lg border">
+          <img
+            ref={imageRef}
+            src={imageSrc}
+            alt={image.name || "Generated image"}
+            className="w-full h-full object-cover"
+            onError={handleImageError}
+          />
+          <div className="absolute bottom-0 left-0 right-0 bg-background/80 backdrop-blur-sm p-2 flex justify-between items-center">
+            {isEditing ? (
+              <div className="flex gap-1 w-full">
+                <Input
+                  value={newName}
+                  onChange={(e) => setNewName(e.target.value)}
+                  className="h-7 text-xs"
+                  placeholder="Image name"
+                  autoFocus
+                />
+                <Button
+                  size="icon"
+                  variant="ghost"
+                  onClick={saveEdit}
+                  className="h-7 w-7"
+                >
+                  <Check className="h-3 w-3" />
+                </Button>
+                <Button
+                  size="icon"
+                  variant="ghost"
+                  onClick={cancelEdit}
+                  className="h-7 w-7"
+                >
+                  <X className="h-3 w-3" />
+                </Button>
+              </div>
+            ) : (
+              <>
+                <div
+                  className="text-xs font-medium truncate max-w-[100px]"
+                  onClick={startEditing}
+                >
+                  {image.name ||
+                    new Date(image.timestamp).toLocaleString(undefined, {
+                      month: "short",
+                      day: "numeric",
+                      hour: "2-digit",
+                      minute: "2-digit",
+                    })}
+                </div>
+                <div className="flex gap-1">
+                  <Button
+                    size="icon"
+                    variant="ghost"
+                    onClick={handleDownload}
+                    className="h-6 w-6"
+                  >
+                    <Download className="h-3 w-3" />
+                  </Button>
+                  <Button
+                    size="icon"
+                    variant="ghost"
+                    onClick={handleDelete}
+                    className="h-6 w-6"
+                  >
+                    <Trash className="h-3 w-3" />
+                  </Button>
+                  <Button
+                    size="icon"
+                    variant="ghost"
+                    onClick={startEditing}
+                    className="h-6 w-6"
+                  >
+                    <Edit className="h-3 w-3" />
+                  </Button>
+                </div>
+              </>
+            )}
+          </div>
+        </div>
+      </div>
+    );
+  }
+);
+
+GalleryImage.displayName = "GalleryImage";
+
 export function EnhancedMiniGallery({
   images,
   onDeleteImage,
   onDownloadImage,
+  onRenameImage,
+  onUpdateImage,
 }: EnhancedMiniGalleryProps) {
   const [selectedImage, setSelectedImage] = useState<GeneratedImage | null>(
     null
@@ -188,7 +353,7 @@ export function EnhancedMiniGallery({
                   className="h-8 w-8 p-0"
                   onClick={(e) => handleDelete(image.id, e)}
                 >
-                  <Trash2 className="w-4 h-4" />
+                  <Trash className="w-4 h-4" />
                 </Button>
               </div>
 
@@ -262,7 +427,7 @@ export function EnhancedMiniGallery({
                     onClick={(e) => handleDelete(selectedImage.id, e)}
                     className="flex items-center gap-2"
                   >
-                    <Trash2 className="w-4 h-4" />
+                    <Trash className="w-4 h-4" />
                     Delete
                   </Button>
                 </div>
@@ -274,3 +439,5 @@ export function EnhancedMiniGallery({
     </Card>
   );
 }
+
+EnhancedMiniGallery.displayName = "EnhancedMiniGallery";

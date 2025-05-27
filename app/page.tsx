@@ -563,6 +563,7 @@ export default function FooocusInpaintingApp() {
     }
   };
 
+  // Modify the queryJobStatus function to store base64 data and avoid UI refreshes
   const queryJobStatus = async (jobId: string) => {
     try {
       const response = await fetch(
@@ -594,45 +595,58 @@ export default function FooocusInpaintingApp() {
               },
             });
             const blob = await imageResponse.blob();
-            const objectUrl = URL.createObjectURL(blob);
 
-            // Set the result image to the object URL to display it properly
-            setResultImage(objectUrl);
-            setResultImageBlob(blob);
+            // Create a FileReader to get base64 data for permanent storage
+            const reader = new FileReader();
+            reader.onloadend = () => {
+              // Get base64 data by removing the data URL prefix
+              const base64Data = (reader.result as string).split(",")[1];
 
-            // Create a unique ID for the new image
-            const id = `${Date.now()}-${Math.random()
-              .toString(36)
-              .substr(2, 9)}`;
+              // Create a unique ID
+              const id = `${Date.now()}-${Math.random()
+                .toString(36)
+                .substr(2, 9)}`;
 
-            // Store the generated image with both blob and object URL
-            const newImage: GeneratedImage = {
-              id,
-              url: objectUrl,
-              blob,
-              prompt: sessionState.prompt,
-              timestamp: Date.now(),
-              jobId,
+              // Create object URL for temporary display
+              const objectUrl = URL.createObjectURL(blob);
+              setResultImage(objectUrl);
+              setResultImageBlob(blob);
+
+              // Create new image with both blob (for immediate use) and base64 (for storage)
+              const newImage: GeneratedImage = {
+                id,
+                url: objectUrl,
+                blob,
+                base64Data,
+                prompt: sessionState.prompt,
+                negativePrompt: sessionState.negativePrompt,
+                timestamp: Date.now(),
+                jobId,
+              };
+
+              // Add to gallery only once when finished
+              if (data.job_status === "Finished") {
+                setGeneratedImages((prev) => {
+                  // Check if this image is already in the gallery by ID or very recent timestamp
+                  const isDuplicate = prev.some(
+                    (img) =>
+                      img.jobId === jobId ||
+                      (img.prompt === sessionState.prompt &&
+                        Math.abs(img.timestamp - newImage.timestamp) < 5000)
+                  );
+
+                  return isDuplicate ? prev : [newImage, ...prev];
+                });
+
+                setIsLoading(false);
+                setCurrentJobId("");
+                toast({
+                  title: "Success",
+                  description: "Image generated successfully!",
+                });
+              }
             };
-
-            // Update local storage with the new image without duplicates
-            setGeneratedImages((prev) => {
-              // Check if this image is already in the gallery by comparing timestamp and prompt
-              const isDuplicate = prev.some(
-                (img) =>
-                  img.prompt === sessionState.prompt &&
-                  Math.abs(img.timestamp - newImage.timestamp) < 5000
-              );
-
-              return isDuplicate ? prev : [newImage, ...prev];
-            });
-
-            setIsLoading(false);
-            setCurrentJobId("");
-            toast({
-              title: "Success",
-              description: "Image generated successfully!",
-            });
+            reader.readAsDataURL(blob);
           } catch (error) {
             console.error("Failed to fetch image blob:", error);
             // Fallback to direct URL if blob fetch fails
@@ -886,23 +900,32 @@ export default function FooocusInpaintingApp() {
     }
   };
 
+  // Update the downloadImage function to use the stored base64 when available
   const downloadImage = (image: GeneratedImage) => {
     try {
       if (image.blob) {
-        // Use blob for download (preferred method)
+        // Use blob for download (preferred method for current session)
         const url = URL.createObjectURL(image.blob);
         const link = document.createElement("a");
         link.href = url;
-        link.download = `inpainted_image_${image.timestamp}.png`;
+        link.download = `inpainted_image_${image.name || image.timestamp}.png`;
         document.body.appendChild(link);
         link.click();
         document.body.removeChild(link);
         URL.revokeObjectURL(url);
+      } else if (image.base64Data) {
+        // Use base64 data if blob is not available (after page refresh)
+        const link = document.createElement("a");
+        link.href = `data:image/png;base64,${image.base64Data}`;
+        link.download = `inpainted_image_${image.name || image.timestamp}.png`;
+        document.body.appendChild(link);
+        link.click();
+        document.body.removeChild(link);
       } else if (image.url) {
-        // Fallback to direct image URL
+        // Fallback to URL (least reliable)
         const link = document.createElement("a");
         link.href = image.url;
-        link.download = `inpainted_image_${image.timestamp}.png`;
+        link.download = `inpainted_image_${image.name || image.timestamp}.png`;
         link.target = "_blank";
         link.rel = "noopener noreferrer";
         document.body.appendChild(link);
