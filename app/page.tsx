@@ -527,6 +527,7 @@ export default function FooocusInpaintingApp() {
     try {
       const response = await fetch(
         `${sessionState.apiUrl}/v1/generation/job-queue`,
+
         {
           headers: {
             "ngrok-skip-browser-warning": "true",
@@ -547,6 +548,7 @@ export default function FooocusInpaintingApp() {
     try {
       const response = await fetch(
         `${sessionState.apiUrl}/v1/generation/job-history`,
+
         {
           headers: {
             "ngrok-skip-browser-warning": "true",
@@ -568,6 +570,7 @@ export default function FooocusInpaintingApp() {
     try {
       const response = await fetch(
         `${sessionState.apiUrl}/v1/generation/query-job?job_id=${jobId}&require_step_preview=false`,
+
         {
           headers: {
             "ngrok-skip-browser-warning": "true",
@@ -595,48 +598,21 @@ export default function FooocusInpaintingApp() {
               },
             });
             const blob = await imageResponse.blob();
+            setResultImageBlob(blob);
 
-            // Create a FileReader to get base64 data for permanent storage
-            const reader = new FileReader();
-            reader.onloadend = () => {
-              // Get base64 data by removing the data URL prefix
-              const base64Data = (reader.result as string).split(",")[1];
-
-              // Create a unique ID
-              const id = `${Date.now()}-${Math.random()
-                .toString(36)
-                .substr(2, 9)}`;
-
-              // Create object URL for temporary display
-              const objectUrl = URL.createObjectURL(blob);
-              setResultImage(objectUrl);
-              setResultImageBlob(blob);
-
-              // Create new image with both blob (for immediate use) and base64 (for storage)
-              const newImage: GeneratedImage = {
-                id,
-                url: objectUrl,
-                blob,
-                base64Data,
-                prompt: sessionState.prompt,
-                negativePrompt: sessionState.negativePrompt,
-                timestamp: Date.now(),
-                jobId,
-              };
-
-              // Add to gallery only once when finished
-              if (data.job_status === "Finished") {
-                setGeneratedImages((prev) => {
-                  // Check if this image is already in the gallery by ID or very recent timestamp
-                  const isDuplicate = prev.some(
-                    (img) =>
-                      img.jobId === jobId ||
-                      (img.prompt === sessionState.prompt &&
-                        Math.abs(img.timestamp - newImage.timestamp) < 5000)
-                  );
-
-                  return isDuplicate ? prev : [newImage, ...prev];
-                });
+            // Add to gallery
+            const newImage: GeneratedImage = {
+              id: `${Date.now()}-${Math.random().toString(36).substr(2, 9)}`,
+              url: imageUrl,
+              blob,
+              prompt: sessionState.prompt,
+              timestamp: Date.now(),
+              jobId,
+            };
+            setGeneratedImages((prev) => [newImage, ...prev]);
+          } catch (error) {
+            console.error("Failed to fetch image blob:", error);
+          }
 
                 setIsLoading(false);
                 setCurrentJobId("");
@@ -664,6 +640,7 @@ export default function FooocusInpaintingApp() {
     try {
       const response = await fetch(
         `${sessionState.apiUrl}/v1/generation/stop`,
+
         {
           method: "POST",
           headers: {
@@ -865,6 +842,7 @@ export default function FooocusInpaintingApp() {
 
       const response = await fetch(
         `${sessionState.apiUrl}/v2/generation/image-inpaint-outpaint`,
+
         {
           method: "POST",
           headers: {
@@ -1027,18 +1005,6 @@ export default function FooocusInpaintingApp() {
       prev.map((img) => (img.id === id ? { ...img, ...updates } : img))
     );
   };
-
-  // Add this to your cleanup logic or component unmount
-  useEffect(() => {
-    return () => {
-      // Clean up object URLs when component unmounts
-      generatedImages.forEach((image) => {
-        if (image.url && image.url.startsWith("blob:")) {
-          URL.revokeObjectURL(image.url);
-        }
-      });
-    };
-  }, []);
 
   return (
     <div className="min-h-screen bg-gradient-to-br from-background via-background to-muted/20 transition-colors duration-300">
