@@ -1,7 +1,7 @@
 "use client";
 
 import type React from "react";
-import { useState } from "react";
+import { useState, useEffect, useRef } from "react";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
@@ -71,6 +71,52 @@ export function EnhancedMiniGallery({
     });
   };
 
+  const ImageWithNgrokHeaders = ({
+    url,
+    alt,
+  }: {
+    url: string;
+    alt: string;
+  }) => {
+    const [imageSrc, setImageSrc] = useState<string>("");
+    const imgRef = useRef<HTMLImageElement>(null);
+
+    useEffect(() => {
+      // Check if the URL contains "ngrok"
+      if (url && url.includes("ngrok")) {
+        // Fetch the image with the required headers
+        fetch(url, {
+          headers: {
+            "ngrok-skip-browser-warning": "true",
+            "User-Agent": "FooocusInpaintingApp/1.0",
+          },
+        })
+          .then((response) => response.blob())
+          .then((blob) => {
+            const objectUrl = URL.createObjectURL(blob);
+            setImageSrc(objectUrl);
+          })
+          .catch((error) => {
+            console.error("Failed to load image:", error);
+            // Fallback to direct URL
+            setImageSrc(url);
+          });
+      } else {
+        // For non-ngrok URLs, use the URL directly
+        setImageSrc(url);
+      }
+    }, [url]);
+
+    return (
+      <img
+        ref={imgRef}
+        src={imageSrc || "/placeholder.svg"}
+        alt={alt}
+        className="w-full h-full object-cover"
+      />
+    );
+  };
+
   if (images.length === 0) {
     return (
       <Card className="border-2 shadow-lg">
@@ -111,12 +157,9 @@ export function EnhancedMiniGallery({
               key={image.id}
               className="group relative aspect-square cursor-pointer rounded-lg overflow-hidden border-2 border-border hover:border-primary transition-all duration-200 hover:shadow-md"
             >
-              <img
-                src={image.url || "/placeholder.svg"}
-                alt={`Generated ${formatDate(image.timestamp)}`}
-                className="w-full h-full object-cover group-hover:scale-105 transition-transform duration-200"
-                loading="lazy"
-                onClick={() => setSelectedImage(image)}
+              <ImageWithNgrokHeaders
+                url={image.url}
+                alt={image.name || "Generated image"}
               />
 
               <div className="absolute inset-0 bg-black/0 group-hover:bg-black/20 transition-colors duration-200" />

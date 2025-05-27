@@ -527,7 +527,6 @@ export default function FooocusInpaintingApp() {
     try {
       const response = await fetch(
         `${sessionState.apiUrl}/v1/generation/job-queue`,
-
         {
           headers: {
             "ngrok-skip-browser-warning": "true",
@@ -548,7 +547,6 @@ export default function FooocusInpaintingApp() {
     try {
       const response = await fetch(
         `${sessionState.apiUrl}/v1/generation/job-history`,
-
         {
           headers: {
             "ngrok-skip-browser-warning": "true",
@@ -569,7 +567,6 @@ export default function FooocusInpaintingApp() {
     try {
       const response = await fetch(
         `${sessionState.apiUrl}/v1/generation/query-job?job_id=${jobId}&require_step_preview=false`,
-
         {
           headers: {
             "ngrok-skip-browser-warning": "true",
@@ -598,12 +595,13 @@ export default function FooocusInpaintingApp() {
               },
             });
             const blob = await imageResponse.blob();
+            const objectUrl = URL.createObjectURL(blob);
             setResultImageBlob(blob);
 
-            // Add to gallery
+            // Store the objectUrl instead of the ngrok URL
             const newImage: GeneratedImage = {
               id: `${Date.now()}-${Math.random().toString(36).substr(2, 9)}`,
-              url: imageUrl,
+              url: objectUrl, // Use the object URL instead of the direct ngrok URL
               blob,
               prompt: sessionState.prompt,
               timestamp: Date.now(),
@@ -631,7 +629,6 @@ export default function FooocusInpaintingApp() {
     try {
       const response = await fetch(
         `${sessionState.apiUrl}/v1/generation/stop`,
-
         {
           method: "POST",
           headers: {
@@ -833,7 +830,6 @@ export default function FooocusInpaintingApp() {
 
       const response = await fetch(
         `${sessionState.apiUrl}/v2/generation/image-inpaint-outpaint`,
-
         {
           method: "POST",
           headers: {
@@ -987,6 +983,18 @@ export default function FooocusInpaintingApp() {
       prev.map((img) => (img.id === id ? { ...img, ...updates } : img))
     );
   };
+
+  // Add this to your cleanup logic or component unmount
+  useEffect(() => {
+    return () => {
+      // Clean up object URLs when component unmounts
+      generatedImages.forEach((image) => {
+        if (image.url && image.url.startsWith("blob:")) {
+          URL.revokeObjectURL(image.url);
+        }
+      });
+    };
+  }, []);
 
   return (
     <div className="min-h-screen bg-gradient-to-br from-background via-background to-muted/20 transition-colors duration-300">
