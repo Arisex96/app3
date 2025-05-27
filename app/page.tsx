@@ -584,10 +584,9 @@ export default function FooocusInpaintingApp() {
             "http://127.0.0.1:8888",
             sessionState.apiUrl
           );
-          setResultImage(imageUrl);
 
-          // Fetch the image as blob for proper download
           try {
+            // Fetch the image with proper headers to bypass ngrok warning
             const imageResponse = await fetch(imageUrl, {
               headers: {
                 "ngrok-skip-browser-warning": "true",
@@ -596,28 +595,50 @@ export default function FooocusInpaintingApp() {
             });
             const blob = await imageResponse.blob();
             const objectUrl = URL.createObjectURL(blob);
+
+            // Set the result image to the object URL to display it properly
+            setResultImage(objectUrl);
             setResultImageBlob(blob);
 
-            // Store the objectUrl instead of the ngrok URL
+            // Create a unique ID for the new image
+            const id = `${Date.now()}-${Math.random()
+              .toString(36)
+              .substr(2, 9)}`;
+
+            // Store the generated image with both blob and object URL
             const newImage: GeneratedImage = {
-              id: `${Date.now()}-${Math.random().toString(36).substr(2, 9)}`,
-              url: objectUrl, // Use the object URL instead of the direct ngrok URL
+              id,
+              url: objectUrl,
               blob,
               prompt: sessionState.prompt,
               timestamp: Date.now(),
               jobId,
             };
-            setGeneratedImages((prev) => [newImage, ...prev]);
+
+            // Update local storage with the new image without duplicates
+            setGeneratedImages((prev) => {
+              // Check if this image is already in the gallery by comparing timestamp and prompt
+              const isDuplicate = prev.some(
+                (img) =>
+                  img.prompt === sessionState.prompt &&
+                  Math.abs(img.timestamp - newImage.timestamp) < 5000
+              );
+
+              return isDuplicate ? prev : [newImage, ...prev];
+            });
+
+            setIsLoading(false);
+            setCurrentJobId("");
+            toast({
+              title: "Success",
+              description: "Image generated successfully!",
+            });
           } catch (error) {
             console.error("Failed to fetch image blob:", error);
+            // Fallback to direct URL if blob fetch fails
+            setResultImage(imageUrl);
+            setIsLoading(false);
           }
-
-          setIsLoading(false);
-          setCurrentJobId("");
-          toast({
-            title: "Success",
-            description: "Image generated successfully!",
-          });
         }
       }
     } catch (error) {
